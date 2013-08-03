@@ -16,14 +16,17 @@ private:
 	Stream&    _port;
 	int bPin;
 	int sPin;
+	int priority;
+	int waitDelay;
 public:
 	SMP(byte modID, Stream& port, int bPin, int sPin);
-
+	SMP(byte modID, Stream& port, int bPin, int sPin, int modPriority);
 public:
 	inline Stream& port	() const {return _port;}
+	void sendData(byte packet[]);	
+	int readData(byte packet[]);
 	void setID(byte modID);
-	void sendData(byte packet[]);
-	int getData(byte packet[]);
+	void setPriority(int priority);
 	
 };
 

@@ -9,6 +9,7 @@ SMP::SMP(byte modID, Stream& port, int busyPin, int sendingPin)
   : ID(modID), _port(port)
 {
 	header = 170;
+	priority = 200;
 	bPin = busyPin;
 	sPin = sendingPin;
 	pinMode(bPin, INPUT);
@@ -16,9 +17,16 @@ SMP::SMP(byte modID, Stream& port, int busyPin, int sendingPin)
 	digitalWrite(sPin, HIGH);
 }
 
-void SMP::setID(byte modID)
+SMP::SMP(byte modID, Stream& port, int busyPin, int sendingPin, int modPriority)
+  : ID(modID), _port(port)
 {
-	ID = modID;
+	header = 170;
+	bPin = busyPin;
+	sPin = sendingPin;
+	priority = modPriority;
+	pinMode(bPin, INPUT);
+	pinMode(sPin, OUTPUT);
+	digitalWrite(sPin, HIGH);
 }
 
 void SMP::sendData(byte packet[])
@@ -29,7 +37,7 @@ void SMP::sendData(byte packet[])
 	
 	while(test && timeout<100)//busy waiting
 	{
-		int x = random(10);
+		int x = random(priority);
 		delay(x);
 		test = digitalRead(bPin);
 		timeout++;
@@ -54,11 +62,14 @@ void SMP::sendData(byte packet[])
 	}
 }
 
-int SMP::getData(byte packet[])
+int SMP::readData(byte packet[])
 {
 	byte modID;
 	byte buff;
 	byte dataChecksum = 0;
+	byte dLength;
+	unsigned int tPre;
+	unsigned int tWatch;
 	if(_port.available() >= 5)
 	{
 		buff = _port.read();
@@ -66,14 +77,20 @@ int SMP::getData(byte packet[])
 		{
 			modID = _port.read();		//ID Byte
 			dataChecksum += modID;
-			buff = _port.read();		//Length Byte
-			dataChecksum += buff;
-			packet[0] = buff;
-			for(int i = 0; i < buff; i++)
+			dLength = _port.read();		//Length Byte
+			dataChecksum += dLength;
+			packet[0] = dLength;
+			tPre = millis();
+			for(int i = 0; i < dLength; i++)
 			{
+				tWatch = millis();
 				buff = _port.read();		//Data Bytes
 				dataChecksum += buff;
 				packet[i +1] = buff;
+				if((tWatch - tPre)>100)
+				{
+					return 0;	//timeout
+				}
 			}
 			if(dataChecksum == _port.read())
 			{
@@ -89,12 +106,22 @@ int SMP::getData(byte packet[])
 		else
 		{
 			//header error, attempt to continue reading more data
-			getData(packet);
+			readData(packet);
 		}
 	}
 	else
 	{
 		return 0;
 	}
+}
+
+void SMP::setID(byte modID)
+{
+	ID = modID;
+}
+
+void SMP::setPriority(int modPriority)
+{
+	priority = modPriority;
 }
   
